@@ -33,7 +33,7 @@
 #include <nodelet_topic_tools/nodelet_throttle.h>
 #include <sensor_msgs/Image.h>
 #include <pluginlib/class_list_macros.h>
-
+using namespace cv;
 
 // part of the cake recipe for a nodelet!
 // note, this is a plugin (a library) loadable by a manager
@@ -131,8 +131,16 @@ PLUGINLIB_EXPORT_CLASS(fakecam::NodeletThrottleImage, nodelet::Nodelet);
      imageSlow_pub_ = it->advertise(slower_image_topic_, 1);
    }
 
+
+    // pre-alocating output image with the correct output size
+    // attention: height_ is #rows, width_ is #collumns. rows come first
+    bridgedImage_.image = cv::Mat(height_, width_ , CV_8UC1);
+
+
     NODELET_INFO("FakecamNodelet::onInit subscribing to %s ", imagetopicname.c_str());
     image_sub_ = it->subscribe(imagetopicname, 1, &FakecamNodelet::RawImgCallback, this);
+
+
 
     initHasRun = true;
     NODELET_INFO("FakecamNodelet::onInit");
@@ -142,9 +150,11 @@ PLUGINLIB_EXPORT_CLASS(fakecam::NodeletThrottleImage, nodelet::Nodelet);
 
 void FakecamNodelet::RawImgCallback(const sensor_msgs::ImageConstPtr& image_msg)
 {
-  if (!initHasRun) { NODELET_WARN_THROTTLE(1,"esmocv callback: onInit() has not run !!!"); return; }
-  NODELET_INFO_THROTTLE(10,"esmocv callback: image %d x %d",image_msg->width, image_msg->height);
+  if (!initHasRun) { NODELET_WARN_THROTTLE(1,"fakecam callback: onInit() has not run !!!"); return; }
+  NODELET_INFO_THROTTLE(10,"fakecam callback: image %d x %d",image_msg->width, image_msg->height);
 
+  cv::Mat buffer = cv::Mat(image_msg->height, image_msg->width , CV_8UC1);
+  cv::Mat image_rot = cv::Mat(image_msg->height, image_msg->width , CV_8UC1);
 
   //////////// cv bridge, convert ros message in opencv object
   cv_bridge::CvImageConstPtr cv_ptr;
@@ -159,20 +169,38 @@ void FakecamNodelet::RawImgCallback(const sensor_msgs::ImageConstPtr& image_msg)
 
   if (pub_every_frame_>0) {
     if ((count_frames_ % pub_every_frame_)==0) {
-      cv_bridge::CvImage bridgedImage;
-      bridgedImage.header = image_msg->header;
-      bridgedImage.encoding = sensor_msgs::image_encodings::MONO8;
 
-      cv_bridge::CvImageConstPtr cv_image = cv_bridge::toCvShare(image_msg);
-      cv_bridge::CvImagePtr cv_image_scaled = boost::make_shared<cv_bridge::CvImage>();
-      cv_image_scaled->header = cv_image->header;
-      cv_image_scaled->encoding = cv_image->encoding;
+      bridgedImage_.header = image_msg->header;
 
-      //cv::resize(cv_ptr->image, cv_image_scaled, cv::Size(width_, height_),0, 0, cv::INTER_LINEAR);
-      cv::resize(cv_image->image, cv_image_scaled->image, cv::Size(), 0.5, 0.5, cv::INTER_LINEAR);
-      bridgedImage.image = cv_ptr->image;
-      imageSlow_pub_.publish(bridgedImage.toImageMsg());
+      bridgedImage_.encoding = sensor_msgs::image_encodings::MONO8;
+
+      //cv_bridge::CvImageConstPtr cv_image = cv_bridge::toCvShare(image_msg);
+      //cv_bridge::CvImagePtr cv_image_scaled = boost::make_shared<cv_bridge::CvImage>();
+      //cv_image_scaled->header = cv_image->header;
+      //cv_image_scaled->encoding = cv_image->encoding;
+
+      //cv::resize(cv_ptr->image, bridgedImage_.image, cv::Size(width_, height_),0, 0, cv::INTER_LINEAR);
+      //bridgedImage_.image = cv_ptr->image;
+      buffer = cv_ptr->image;
+      cv::resize(buffer, bridgedImage_.image, cv::Size(width_, height_),0, 0, cv::INTER_LINEAR);
+
+      //image_rot = bridgedImage_.image;
+      cv::flip(bridgedImage_.image, bridgedImage_.image,-1);
+      // Draw a rectangle ( 5th argument is not -ve)
+      //cv::rectangle( bridgedImage_.image, Point( 15, 20 ), Point( 70, 50), Scalar( 255, 255, 255 ), +1, 4 );
+      //cv::imshow("Image1", bridgedImage_.image);
+      // here it waits for 1ms, but we can not wait less time.
+      //cv::waitKey(1); // needed for imshow http://stackoverflow.com/questions/5217519/opencv-cvwaitkey
+      // Draw a filled rectangle ( 5th argument is -ve)
+      //rectangle( image, Point( 115, 120 ), Point( 170, 150), Scalar( 100, 155, 25 ), -1, 8 );
+      // tried updateWindow instead of waitKey, but got the error below:
+      //OpenCV Error: No OpenGL support (The library is compiled without OpenGL support)
+      //cv::updateWindow("Image1");
+      //cv::resize(cv_image->image, cv_image_scaled->image, cv::Size(), 0.5, 0.5, cv::INTER_LINEAR);
+      //bridgedImage.image = cv_ptr->image;
+      imageSlow_pub_.publish(bridgedImage_.toImageMsg());
       count_frames_ = 0;
+
     }//endif of publish slow image topic
   }
   count_frames_++; // always increment even if it do not publish

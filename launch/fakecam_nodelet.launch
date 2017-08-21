@@ -11,8 +11,8 @@
   <param name="resize_width" value="$(arg width)" />
   <param name="resize_height" value="$(arg height)" />
 
-  <!--node pkg="nodelet" type="nodelet" name="ptgrey_simple" args="load ptgrey_simple/ptgrey_simple esmnodelet" output="screen">
-  </node-->
+  <!--node pkg="nodelet" type="nodelet" name="ptgrey_simple" args="load ptgrey_simple/ptgrey_simple standalone_nodelet" output="screen">
+</node-->
   <include file="$(find flea3)/launch/single_nodelet.launch"/>
 
   <param name="/image_topic_name" type="string" value="$(arg image_topic_name)" />
@@ -23,10 +23,9 @@
   </node>
 
   <!-- remap input topics -->
-  <remap from = "image" to = "/droni/image_raw" />
-
-  <node pkg="nodelet" type="nodelet" name="imageview" args="load image_view/image manager"  output="screen">
+  <!--remap from = "image" to = "$(arg image_topic_name)_slow" />
+  <node pkg="nodelet" type="nodelet" name="imageview" args="load image_view/image    standalone_nodelet"  output="screen">
       <param name="autosize" value="false" />
-  </node>
+  </node-->
 
 </launch>

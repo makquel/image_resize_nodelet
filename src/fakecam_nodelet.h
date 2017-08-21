@@ -61,7 +61,7 @@ public:
   ~FakecamNodelet() {  }// destructor
 
   void callback(const ros::TimerEvent& e);
-  void RawImgCallback(const sensor_msgs::ImageConstPtr& msg);
+  void RawImgCallback(const sensor_msgs::ImageConstPtr& image_msg);
   const char* WINDOW;/// used for debug.
 
 private:
@@ -82,6 +82,8 @@ private:
 
   image_transport::Publisher pub_;
   sensor_msgs::ImagePtr image_msg_;
+
+  cv_bridge::CvImage bridgedImage_; // pre-alocate output image
 
   ros::Timer timer1_;/// we are fake, so our "camera driver" is only a timer to generate a periodic callback...
   char current_color_;
